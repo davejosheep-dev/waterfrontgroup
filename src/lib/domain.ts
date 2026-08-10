@@ -56,8 +56,8 @@ export function localDateFromUtc(value: string | Date): string {
   return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
 }
 
-export function zonedDateTimeToUtc(localDate: string, localTime: string): Date {
-  return fromZonedTime(`${localDate}T${localTime}:00`, TIMEZONE);
+export function zonedDateTimeToUtc(localDate: string, localTime: string, timezone = TIMEZONE): Date {
+  return fromZonedTime(`${localDate}T${localTime}:00`, timezone);
 }
 
 export function determineDepositRules(input: DepositRuleInput): string[] {

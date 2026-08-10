@@ -25,7 +25,7 @@ function PublicShell({ children }: { children: ReactNode }) {
     <header className="border-b border-[var(--border)] bg-[var(--card)]/95">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
         <Link href="/reserve/waterfront-seafood" aria-label="Waterfront booking requests"><Image src="/waterfront-logo.png" width={172} height={108} alt="Waterfront Seafood & Cocktails" className="h-auto w-[138px] sm:w-[158px]" priority /></Link>
-        <div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--accent-strong)]">Staff preview</div><div className="mt-1 text-xs text-[var(--muted-foreground)]">Asia/Manila · English</div></div>
+        <div className="flex items-center gap-4"><Link href="/reserve/waterfront-seafood/table" className="hidden items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-bold text-white sm:inline-flex">Reserve a table <ArrowRight size={14} /></Link><div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--accent-strong)]">Staff preview</div><div className="mt-1 text-xs text-[var(--muted-foreground)]">Asia/Manila · English</div></div></div>
       </div>
     </header>
     {children}
