@@ -1,0 +1,216 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+
+  --background: #f7f5f0;
+  --foreground: #172321;
+  --card: #ffffff;
+  --card-foreground: #172321;
+  --popover: #ffffff;
+  --popover-foreground: #172321;
+  --primary: #216e68;
+  --primary-strong: #195b56;
+  --primary-foreground: #ffffff;
+  --primary-soft: #e9f2ef;
+  --secondary: #f1efe9;
+  --secondary-foreground: #263936;
+  --muted: #f2f0ea;
+  --muted-foreground: #66716e;
+  --accent: #e8794c;
+  --accent-strong: #a94f30;
+  --accent-foreground: #ffffff;
+  --accent-soft: #fff0e9;
+  --destructive: #b64634;
+  --destructive-foreground: #ffffff;
+  --border: #e5e1d9;
+  --input: #d7d2c8;
+  --ring: #216e68;
+  --radius: 0.625rem;
+
+  --status-success: #1e6a4c;
+  --status-success-soft: #e8f4ed;
+  --status-warning: #8a5a12;
+  --status-warning-soft: #fff4d8;
+  --status-danger: #a53c36;
+  --status-danger-soft: #fcebea;
+  --status-info: #315f87;
+  --status-info-soft: #eaf2f9;
+  --status-neutral: #5e6966;
+  --status-neutral-soft: #eff0ed;
+  --status-vip: #6a4e7f;
+  --status-vip-soft: #f2ebf6;
+
+  /* Compatibility aliases retained while domain screens migrate to semantic names. */
+  --ink: var(--foreground);
+  --line: color-mix(in srgb, var(--foreground) 9%, transparent);
+  --cream: var(--background);
+  --paper: var(--card);
+  --orange: var(--accent);
+  --orange-dark: var(--accent-strong);
+  --green: var(--primary);
+  --green-soft: var(--primary-soft);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--status-success);
+  --color-success-soft: var(--status-success-soft);
+  --color-warning: var(--status-warning);
+  --color-warning-soft: var(--status-warning-soft);
+  --color-danger: var(--status-danger);
+  --color-danger-soft: var(--status-danger-soft);
+  --color-info: var(--status-info);
+  --color-info-soft: var(--status-info-soft);
+  --color-neutral: var(--status-neutral);
+  --color-neutral-soft: var(--status-neutral-soft);
+  --color-vip: var(--status-vip);
+  --color-vip-soft: var(--status-vip-soft);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--background); }
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Geist, "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+}
+
+button, input, select, textarea { font: inherit; }
+button {
+  cursor: pointer;
+  transition-duration: 160ms;
+  transition-property: background-color, border-color, color, opacity, transform;
+  transition-timing-function: ease;
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { cursor: not-allowed; }
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 20%, white);
+  color: var(--foreground);
+}
+
+.font-display {
+  font-family: Geist, "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.font-mono,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.wf-surface {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--card);
+}
+
+.wf-control {
+  min-height: 40px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.wf-control:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 12%, transparent);
+}
+
+.wf-button-primary {
+  min-height: 40px;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+
+.wf-button-primary:hover { background: var(--primary-strong); }
+
+.wf-button-secondary {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--secondary-foreground);
+  font-weight: 600;
+}
+
+.wf-button-secondary:hover { background: var(--secondary); }
+
+.wf-meta {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.scrollbar-thin {
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 42%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.shadow-soft { box-shadow: 0 1px 2px rgb(23 35 33 / 0.035); }
+.grid-fade {
+  background-image:
+    linear-gradient(rgb(23 35 33 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(23 35 33 / 0.035) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise { animation: rise 180ms ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
