@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { CalendarDays, Check, ChevronRight, CircleDollarSign, Clock3, Filter, Inbox, MapPin, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Users, X } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, CircleDollarSign, Clock3, Download, FileText, Filter, Inbox, MapPin, Paperclip, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Upload, Users, X } from "lucide-react";
 import { eventPipelineStages, eventStageLabels, stageProgress, type EventStage } from "@/lib/event-domain";
 import { PageHeader, SectionCard, Button, cx } from "@/components/ui/baseline";
 import type { AccessContext } from "@/lib/access-control";
@@ -37,6 +37,20 @@ type EventRecord = {
   status: EventStage;
   quoted_total: number;
   balance_due: number;
+};
+
+type EventDocumentView = {
+  id: string;
+  event_id: string;
+  file_name: string;
+  document_type: string;
+  scan_status: string;
+  visibility: string;
+  source_type?: string | null;
+  byte_size?: number | null;
+  document_version?: number | null;
+  created_at: string;
+  signed_url?: string | null;
 };
 
 type Hold = { id: string; inquiry_id?: string | null; event_id?: string | null; starts_at: string; ends_at: string; expires_at: string; state: string; priority: number };
@@ -188,7 +202,7 @@ export function EventsWorkspace({ accessContext, venueId, notify }: { accessCont
     </div>
     <div className="grid gap-3 border-b border-border bg-background px-5 py-4 sm:grid-cols-2 xl:grid-cols-4 md:px-6"><Metric icon={<Inbox size={16} />} label="Open pipeline" value={String(openCount)} detail="inquiries & events" /><Metric icon={<CircleDollarSign size={16} />} label="Weighted value" value={formatMoney(pipelineValue)} detail="probability weighted" /><Metric icon={<Clock3 size={16} />} label="Expiring holds" value={String(expiringCount)} detail="within 24 hours" tone={expiringCount ? "amber" : "default"} /><Metric icon={<ShieldCheck size={16} />} label="Stage progress" value={`${selected ? stageProgress(selected.stage) : 0}%`} detail={selected ? eventStageLabels[selected.stage] : "select an inquiry"} /></div>
     {view === "pipeline" ? <div className="overflow-x-auto px-5 py-5 md:px-6"><div className="grid min-w-[2500px] grid-cols-12 gap-3">{eventPipelineStages.map((stage) => { const items = visibleInquiries.filter((inquiry) => inquiry.stage === stage); return <section key={stage} className="min-h-[360px] rounded-lg border border-border bg-secondary/45"><div className="flex items-center justify-between border-b border-border px-3 py-3"><div><h2 className="text-xs font-semibold text-foreground">{eventStageLabels[stage]}</h2><p className="mt-0.5 text-[10px] text-muted-foreground">{items.length} {items.length === 1 ? "record" : "records"}</p></div><span className={cx("rounded-full border px-2 py-1 text-[10px] font-semibold", stageTone(stage))}>{stageProgress(stage)}%</span></div><div className="space-y-2 p-2">{items.map((inquiry) => <InquiryCard key={inquiry.id} inquiry={inquiry} hold={holds.find((hold) => hold.inquiry_id === inquiry.id)} selected={selectedId === inquiry.id} onSelect={() => setSelectedId(inquiry.id)} now={now} />)}{items.length === 0 ? <p className="px-2 py-8 text-center text-[11px] text-muted-foreground">No inquiries here</p> : null}</div></section>; })}</div></div> : <CalendarView inquiries={visibleInquiries} events={events} holds={holds} onSelect={setSelectedId} />}
-    {selected ? <EventDetail inquiry={selected} event={selectedEvent} hold={selectedHold} spaces={spaces} canManage={accessContext.role === "superadmin" || accessContext.role === "manager"} onClose={() => setSelectedId(null)} onHold={() => void createHold()} onConvert={() => void convertSelected()} onMove={(stage) => void moveInquiry(selected, stage)} /> : null}
+    {selected ? <EventDetail inquiry={selected} event={selectedEvent} hold={selectedHold} spaces={spaces} isDemo={accessContext.isDemo} canManage={accessContext.role === "superadmin" || accessContext.role === "manager"} notify={notify} onClose={() => setSelectedId(null)} onHold={() => void createHold()} onConvert={() => void convertSelected()} onMove={(stage) => void moveInquiry(selected, stage)} /> : null}
     {showNew ? <NewInquiryModal venueId={venueId} isDemo={accessContext.isDemo} onClose={() => setShowNew(false)} onCreated={(inquiry) => { setInquiries((current) => [inquiry, ...current]); setShowNew(false); notify("Event inquiry captured and added to the new inquiry stage."); }} notify={notify} /> : null}
   </div>;
 }
@@ -207,9 +221,93 @@ function CalendarView({ inquiries, events, holds, onSelect }: { inquiries: Inqui
   return <div className="px-5 py-5 md:px-6"><SectionCard><div className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="text-sm font-semibold">Event calendar</h2><p className="mt-1 text-xs text-muted-foreground">Confirmed bookings, blocking holds, and soft inquiries share one operational timeline.</p></div><CalendarDays size={18} className="text-primary" /></div><div className="divide-y divide-border">{rows.length ? rows.map((row) => <button key={`${row.kind}-${row.id}`} onClick={() => onSelect(row.id)} className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-secondary/50"><div className="w-20 shrink-0 text-xs font-semibold text-muted-foreground">{formatDate(row.startsAt)}</div><div className={cx("min-w-0 flex-1 rounded-md border px-3 py-2", row.tone)}><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] font-semibold uppercase tracking-[.08em] text-muted-foreground">{row.kind}</span><span className="truncate text-sm font-semibold text-foreground">{row.label}</span></div><div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground"><span className="flex items-center gap-1"><Clock3 size={12} />{new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(row.startsAt))}</span><span className="flex items-center gap-1"><Users size={12} />{row.guests} pax</span></div></div><ChevronRight size={16} className="text-muted-foreground" /></button>) : <p className="px-5 py-12 text-center text-sm text-muted-foreground">No event records match this view.</p>}</div></SectionCard></div>;
 }
 
-function EventDetail({ inquiry, event, hold, spaces, canManage, onClose, onHold, onConvert, onMove }: { inquiry: Inquiry; event?: EventRecord; hold?: Hold; spaces: Space[]; canManage: boolean; onClose: () => void; onHold: () => void; onConvert: () => void; onMove: (stage: EventStage) => void }) {
+function EventDetail({ inquiry, event, hold, spaces, isDemo, canManage, notify, onClose, onHold, onConvert, onMove }: { inquiry: Inquiry; event?: EventRecord; hold?: Hold; spaces: Space[]; isDemo: boolean; canManage: boolean; notify: (message: string) => void; onClose: () => void; onHold: () => void; onConvert: () => void; onMove: (stage: EventStage) => void }) {
   const nextStage = eventPipelineStages[eventPipelineStages.indexOf(inquiry.stage) + 1];
-  return <div className="fixed inset-0 z-[70] flex justify-end bg-foreground/20 backdrop-blur-[1px]"><button aria-label="Close event detail" className="absolute inset-0" onClick={onClose} /><aside className="relative h-full w-full max-w-xl overflow-y-auto border-l border-border bg-card shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between border-b border-border bg-card px-5 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-accent-strong">Event record</p><h2 className="mt-1 text-xl font-semibold text-foreground">{inquiry.event_name || `${inquiry.contact_name} event`}</h2><p className="mt-1 text-xs text-muted-foreground">{inquiry.contact_name} · {inquiry.source}</p></div><button aria-label="Close" onClick={onClose} className="rounded-full border border-border p-2 text-muted-foreground hover:bg-secondary"><X size={16} /></button></div><div className="space-y-5 p-5"><div className={cx("rounded-lg border p-4", stageTone(inquiry.stage))}><div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold">{eventStageLabels[inquiry.stage]}</span><span className="text-xs font-medium">{stageProgress(inquiry.stage)}% through pipeline</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-current" style={{ width: `${stageProgress(inquiry.stage)}%` }} /></div></div><div className="grid grid-cols-2 gap-3"><Detail label="Requested date" value={formatDate(inquiry.requested_starts_at)} icon={<CalendarDays size={14} />} /><Detail label="Expected guests" value={`${inquiry.expected_guests} people`} icon={<Users size={14} />} /><Detail label="Estimated value" value={formatMoney(inquiry.estimated_value, inquiry.currency)} icon={<CircleDollarSign size={14} />} /><Detail label="Next action" value={inquiry.next_action_at ? formatDate(inquiry.next_action_at) : "Not scheduled"} icon={<Clock3 size={14} />} /></div><SectionCard className="p-4"><h3 className="text-xs font-semibold">Contact & requirements</h3><div className="mt-3 space-y-2 text-xs text-muted-foreground"><p>{inquiry.contact_email || "No email captured"}</p><p>{inquiry.contact_phone || "No phone captured"}</p><p className="rounded-md bg-secondary p-3">Add decision-maker, accessibility, menu, vendor access, and timing requirements to keep the operational record complete.</p></div></SectionCard><SectionCard className="p-4"><div className="flex items-center justify-between"><div><h3 className="text-xs font-semibold">Space inventory</h3><p className="mt-1 text-[11px] text-muted-foreground">Occupancy includes setup and teardown buffers.</p></div><MapPin size={16} className="text-primary" /></div>{hold ? <div className="mt-3 flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-xs"><span><b>Pencil hold active</b><br /><span className="text-amber-800">Expires {formatDate(hold.expires_at)}</span></span><span className="font-semibold text-amber-800">Priority {hold.priority}</span></div> : <div className="mt-3 rounded-md border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">No blocking hold yet. Select an active space to protect this date.</div>}{canManage && !hold && <Button className="mt-3 w-full" variant="secondary" onClick={onHold}><MapPin size={15} />Create 24-hour pencil hold</Button>}{spaces.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{spaces.slice(0, 4).map((space) => <div key={space.id} className="rounded-md border border-border bg-background p-3"><div className="flex items-center justify-between"><span className="text-xs font-semibold">{space.name}</span><span className={cx("h-2 w-2 rounded-full", space.available === false ? "bg-amber-500" : "bg-emerald-500")} /></div><p className="mt-1 text-[10px] text-muted-foreground">{space.code} · up to {space.max_capacity} guests</p></div>)}</div> : null}</SectionCard>{event ? <SectionCard className="p-4"><div className="flex items-center gap-2 text-xs font-semibold"><Sparkles size={15} className="text-primary" />Planning event</div><p className="mt-2 text-xs text-muted-foreground">{event.expected_headcount} guests · quoted {formatMoney(event.quoted_total)} · balance {formatMoney(event.balance_due)}</p></SectionCard> : null}<div className="flex flex-wrap gap-2">{canManage && nextStage && <Button onClick={() => onMove(nextStage)}><ChevronRight size={15} />Move to {eventStageLabels[nextStage]}</Button>}{canManage && !event && ["pencil_booking", "proposal_sent", "negotiation", "deposit_pending"].includes(inquiry.stage) && <Button variant="secondary" onClick={onConvert}><Check size={15} />Convert to event</Button>}{canManage && !["lost", "cancelled", "closed"].includes(inquiry.stage) && <Button variant="ghost" onClick={() => onMove("cancelled")}>Cancel inquiry</Button>}</div></div></aside></div>;
+  return <div className="fixed inset-0 z-[70] flex justify-end bg-foreground/20 backdrop-blur-[1px]"><button aria-label="Close event detail" className="absolute inset-0" onClick={onClose} /><aside className="relative h-full w-full max-w-xl overflow-y-auto border-l border-border bg-card shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between border-b border-border bg-card px-5 py-5"><div><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-accent-strong">Event record</p><h2 className="mt-1 text-xl font-semibold text-foreground">{inquiry.event_name || `${inquiry.contact_name} event`}</h2><p className="mt-1 text-xs text-muted-foreground">{inquiry.contact_name} · {inquiry.source}</p></div><button aria-label="Close" onClick={onClose} className="rounded-full border border-border p-2 text-muted-foreground hover:bg-secondary"><X size={16} /></button></div><div className="space-y-5 p-5"><div className={cx("rounded-lg border p-4", stageTone(inquiry.stage))}><div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold">{eventStageLabels[inquiry.stage]}</span><span className="text-xs font-medium">{stageProgress(inquiry.stage)}% through pipeline</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-current" style={{ width: `${stageProgress(inquiry.stage)}%` }} /></div></div><div className="grid grid-cols-2 gap-3"><Detail label="Requested date" value={formatDate(inquiry.requested_starts_at)} icon={<CalendarDays size={14} />} /><Detail label="Expected guests" value={`${inquiry.expected_guests} people`} icon={<Users size={14} />} /><Detail label="Estimated value" value={formatMoney(inquiry.estimated_value, inquiry.currency)} icon={<CircleDollarSign size={14} />} /><Detail label="Next action" value={inquiry.next_action_at ? formatDate(inquiry.next_action_at) : "Not scheduled"} icon={<Clock3 size={14} />} /></div><SectionCard className="p-4"><h3 className="text-xs font-semibold">Contact & requirements</h3><div className="mt-3 space-y-2 text-xs text-muted-foreground"><p>{inquiry.contact_email || "No email captured"}</p><p>{inquiry.contact_phone || "No phone captured"}</p><p className="rounded-md bg-secondary p-3">Add decision-maker, accessibility, menu, vendor access, and timing requirements to keep the operational record complete.</p></div></SectionCard><SectionCard className="p-4"><div className="flex items-center justify-between"><div><h3 className="text-xs font-semibold">Space inventory</h3><p className="mt-1 text-[11px] text-muted-foreground">Occupancy includes setup and teardown buffers.</p></div><MapPin size={16} className="text-primary" /></div>{hold ? <div className="mt-3 flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-xs"><span><b>Pencil hold active</b><br /><span className="text-amber-800">Expires {formatDate(hold.expires_at)}</span></span><span className="font-semibold text-amber-800">Priority {hold.priority}</span></div> : <div className="mt-3 rounded-md border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">No blocking hold yet. Select an active space to protect this date.</div>}{canManage && !hold && <Button className="mt-3 w-full" variant="secondary" onClick={onHold}><MapPin size={15} />Create 24-hour pencil hold</Button>}{spaces.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{spaces.slice(0, 4).map((space) => <div key={space.id} className="rounded-md border border-border bg-background p-3"><div className="flex items-center justify-between"><span className="text-xs font-semibold">{space.name}</span><span className={cx("h-2 w-2 rounded-full", space.available === false ? "bg-amber-500" : "bg-emerald-500")} /></div><p className="mt-1 text-[10px] text-muted-foreground">{space.code} · up to {space.max_capacity} guests</p></div>)}</div> : null}</SectionCard>{event ? <><SectionCard className="p-4"><div className="flex items-center gap-2 text-xs font-semibold"><Sparkles size={15} className="text-primary" />Planning event</div><p className="mt-2 text-xs text-muted-foreground">{event.expected_headcount} guests · quoted {formatMoney(event.quoted_total)} · balance {formatMoney(event.balance_due)}</p></SectionCard><EventFilesPanel eventId={event.id} isDemo={isDemo} canManage={canManage} notify={notify} /></> : null}<div className="flex flex-wrap gap-2">{canManage && nextStage && <Button onClick={() => onMove(nextStage)}><ChevronRight size={15} />Move to {eventStageLabels[nextStage]}</Button>}{canManage && !event && ["pencil_booking", "proposal_sent", "negotiation", "deposit_pending"].includes(inquiry.stage) && <Button variant="secondary" onClick={onConvert}><Check size={15} />Convert to event</Button>}{canManage && !["lost", "cancelled", "closed"].includes(inquiry.stage) && <Button variant="ghost" onClick={() => onMove("cancelled")}>Cancel inquiry</Button>}</div></div></aside></div>;
+}
+
+const documentTypeLabels: Record<string, string> = {
+  quotation: "Quotation",
+  agreement: "Agreement",
+  beo: "BEO",
+  invoice: "Invoice",
+  attachment: "Attachment",
+  other: "Other",
+};
+
+function EventFilesPanel({ eventId, isDemo, canManage, notify }: { eventId: string; isDemo: boolean; canManage: boolean; notify: (message: string) => void }) {
+  const [documents, setDocuments] = useState<EventDocumentView[]>(isDemo ? [{ id: "demo-doc", event_id: eventId, file_name: "blue-harbor-brief.pdf", document_type: "attachment", scan_status: "clean", visibility: "staff", source_type: "upload", byte_size: 184320, document_version: 1, created_at: "2026-08-10T06:00:00Z", signed_url: null }] : []);
+  const [documentType, setDocumentType] = useState("attachment");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(!isDemo);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (isDemo) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/v1/staff/events/${eventId}/documents`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Event documents are unavailable.");
+      setDocuments(data.documents ?? []);
+      setError(null);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Event documents are unavailable.";
+      setError(message);
+    } finally { setLoading(false); }
+  }, [eventId, isDemo]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void refresh(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
+
+  async function uploadFile(event: FormEvent) {
+    event.preventDefault();
+    if (isDemo) return notify("Attachments will be stored after this event is connected to Supabase.");
+    if (!file) return notify("Choose a file first.");
+    setSaving(true);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("documentType", documentType);
+    const response = await fetch(`/api/v1/staff/events/${eventId}/documents`, { method: "POST", body: form });
+    const data = await response.json();
+    setSaving(false);
+    if (!response.ok) return notify(data.error || "The attachment could not be saved.");
+    setFile(null);
+    setError(null);
+    await refresh();
+    notify("Attachment added to the event record.");
+  }
+
+  async function generateQuotation() {
+    if (isDemo) return notify("Quotation preview is available once a real planning event is connected.");
+    setSaving(true);
+    const response = await fetch(`/api/v1/staff/events/${eventId}/documents/quote`, { method: "POST" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setSaving(false);
+      return notify(data.error || "The quotation could not be generated.");
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] || "waterfront-event-quotation.pdf";
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    setSaving(false);
+    await refresh();
+    notify("Branded quotation PDF generated and attached.");
+  }
+
+  function formatBytes(bytes?: number | null) {
+    if (!bytes) return "";
+    return bytes > 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return <SectionCard className="p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2 text-xs font-semibold"><Paperclip size={15} className="text-primary" />Files & documents</div><p className="mt-1 text-[11px] leading-5 text-muted-foreground">Keep briefs, agreements, BEOs, and generated quotations with the event record.</p></div><FileText size={17} className="text-muted-foreground" /></div><div className="mt-3 space-y-2">{loading ? <p className="rounded-md bg-secondary px-3 py-3 text-xs text-muted-foreground">Loading event files…</p> : documents.length ? documents.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary text-primary"><FileText size={15} /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{item.file_name}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{documentTypeLabels[item.document_type] || "Document"} · v{item.document_version || 1} {item.byte_size ? `· ${formatBytes(item.byte_size)}` : ""}</p></div>{item.signed_url ? <a aria-label={`Download ${item.file_name}`} href={item.signed_url} target="_blank" rel="noreferrer" className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"><Download size={15} /></a> : <span className="text-[10px] text-muted-foreground">Private</span>}</div>) : <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">No files attached yet.</p>}</div>{error ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-800">{error}</p> : null}{canManage ? <><form onSubmit={(event) => void uploadFile(event)} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]"><select aria-label="Document type" value={documentType} onChange={(event) => setDocumentType(event.target.value)} className="h-10 rounded-md border border-border bg-background px-3 text-xs"><option value="attachment">Attachment</option><option value="agreement">Agreement</option><option value="beo">BEO</option><option value="invoice">Invoice</option><option value="other">Other</option></select><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-secondary"><Upload size={14} />{file ? file.name.slice(0, 18) : "Choose file"}<input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><Button type="submit" variant="secondary" disabled={saving || !file}>{saving ? "Saving…" : "Attach"}</Button></form><Button type="button" className="mt-2 w-full" variant="secondary" onClick={() => void generateQuotation()} disabled={saving}><Sparkles size={15} />Generate quotation PDF</Button></> : null}<p className="mt-2 text-[10px] text-muted-foreground">Private files are permission-checked. New versions are added as immutable records.</p></SectionCard>;
 }
 
 function Detail({ label, value, icon }: { label: string; value: string; icon: ReactNode }) { return <div className="rounded-md border border-border bg-background p-3"><div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[.08em] text-muted-foreground">{icon}{label}</div><p className="mt-1 text-xs font-semibold text-foreground">{value}</p></div>; }
