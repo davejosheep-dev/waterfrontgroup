@@ -11,6 +11,7 @@ export const appPermissions = [
   "manage_marketing",
   "manage_configuration",
   "manage_members",
+  "manage_events",
 ] as const;
 export type AppPermission = (typeof appPermissions)[number];
 
@@ -40,6 +41,33 @@ export const atomicPermissions = [
   "payments.read",
   "payments.manage",
   "reports.read",
+  "event_config.read",
+  "event_config.manage",
+  "event_inventory.manage",
+  "event_inquiries.read",
+  "event_inquiries.create",
+  "event_inquiries.assign",
+  "event_inquiries.transition",
+  "events.read",
+  "events.create",
+  "events.update",
+  "events.cancel",
+  "events.complete",
+  "event_holds.create",
+  "event_holds.extend",
+  "event_holds.override",
+  "proposals.read",
+  "proposals.create",
+  "proposals.issue",
+  "proposals.approve_discount",
+  "proposals.accept_on_behalf",
+  "event_finance.read",
+  "event_payments.record",
+  "event_refunds.request",
+  "event_refunds.approve",
+  "event_documents.read",
+  "event_documents.manage",
+  "event_sensitive_notes.read",
 ] as const;
 export type AtomicPermission = (typeof atomicPermissions)[number];
 
@@ -50,7 +78,7 @@ export type AtomicPermission = (typeof atomicPermissions)[number];
 export const rolePermissionBundles: Record<AccessRole, readonly AppPermission[]> = {
   superadmin: appPermissions,
   owner: ["view_all_concepts", "view_dashboard"],
-  manager: ["view_dashboard", "operate_reservations", "manage_floor", "manage_payments", "manage_guests", "manage_configuration"],
+  manager: ["view_dashboard", "operate_reservations", "manage_floor", "manage_payments", "manage_guests", "manage_configuration", "manage_events"],
   staff: ["operate_reservations", "manage_floor", "manage_guests"],
 };
 
