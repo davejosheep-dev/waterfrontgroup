@@ -8,7 +8,7 @@ import {
 export { accessRoles };
 export type { AccessRole, AppPermission };
 
-export const appScreens = ["today", "requests", "payments", "floor", "calendar", "guests", "marketing", "notifications", "reports", "settings", "team", "profile"] as const;
+export const appScreens = ["today", "requests", "events", "payments", "floor", "calendar", "guests", "marketing", "notifications", "reports", "settings", "team", "profile"] as const;
 export type AppScreen = (typeof appScreens)[number];
 
 export type AccessContext = {
@@ -69,9 +69,9 @@ export const roleDetails: Record<AccessRole, {
 
 const screenAccess: Record<AccessRole, readonly AppScreen[]> = {
   superadmin: appScreens,
-  owner: ["today", "requests", "payments", "floor", "calendar", "guests", "notifications", "reports", "profile"],
-  manager: ["today", "requests", "payments", "floor", "calendar", "guests", "notifications", "reports", "settings", "profile"],
-  staff: ["today", "requests", "floor", "calendar", "guests", "notifications", "profile"],
+  owner: ["today", "requests", "events", "payments", "floor", "calendar", "guests", "notifications", "reports", "profile"],
+  manager: ["today", "requests", "events", "payments", "floor", "calendar", "guests", "notifications", "reports", "settings", "profile"],
+  staff: ["today", "requests", "events", "floor", "calendar", "guests", "notifications", "profile"],
 };
 
 export function hasPermission(role: AccessRole, permission: AppPermission) {

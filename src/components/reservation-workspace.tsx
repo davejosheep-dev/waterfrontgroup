@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import {
   Bell, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign,
   Clock3, Filter, LayoutDashboard, Menu, MoreHorizontal, Plus, Search, Settings,
@@ -17,6 +17,8 @@ import { PaymentControlAnalyticsPanel, Phase2PolicyPanel, PublicRequestAnalytics
 import { PaymentOperationsWorkspace } from "@/components/payment-operations-workspace";
 import { CrmWorkspace, MarketingWorkspace } from "@/components/crm-marketing-workspaces";
 import { ProfileWorkspace } from "@/components/profile-workspace";
+import { FloorOperationsWorkspace } from "@/components/floor-operations-workspace";
+import { EventsWorkspace } from "@/components/events-workspace";
 import { PageHeader } from "@/components/ui/baseline";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { canAccessScreen, hasPermission, initials, roleDetails, type AccessContext, type AppScreen } from "@/lib/access-control";
@@ -31,6 +33,7 @@ type NavItem = { id: Exclude<Screen, "profile">; label: string; icon: typeof Lay
 const nav: NavItem[] = [
   { id: "today", label: "Today", icon: LayoutDashboard, group: "operations" },
   { id: "requests", label: "Public Requests", icon: Inbox, count: 1, group: "operations" },
+  { id: "events", label: "Events", icon: Sparkles, group: "operations" },
   { id: "floor", label: "Floor plan", icon: TableProperties, group: "operations" },
   { id: "calendar", label: "Calendar", icon: CalendarDays, group: "operations" },
   { id: "guests", label: "Guest directory", icon: Users, group: "guests" },
@@ -142,10 +145,10 @@ export function ReservationWorkspace({ accessContext }: { accessContext: AccessC
     });
   }
 
-  function notify(message: string) {
+  const notify = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3200);
-  }
+  }, []);
 
   return <div className="min-h-screen bg-background text-foreground">
     <aside className={cx("fixed bottom-0 left-0 top-0 z-40 w-[280px] border-r border-border bg-card transition-[width,transform] duration-200 lg:translate-x-0", sidebarCollapsed ? "lg:w-[72px]" : "lg:w-[248px]", mobileNav ? "translate-x-0" : "-translate-x-full")}>
@@ -196,8 +199,9 @@ export function ReservationWorkspace({ accessContext }: { accessContext: AccessC
       <main className="min-h-[calc(100vh-60px)]">
         {screen === "today" && <TodayScreen reservations={reservations} onSelect={setSelected} onNew={() => setModal("new")} onAvailability={() => setModal("availability")} />}
         {screen === "requests" && <PublicRequestsWorkspace onConverted={(reservation) => setReservations((previous) => [...previous, reservation])} notify={notify} />}
+        {screen === "events" && <EventsWorkspace accessContext={accessContext} venueId={currentVenueId} notify={notify} />}
         {screen === "payments" && <PaymentOperationsWorkspace notify={notify} />}
-        {screen === "floor" && <FloorPlanScreen reservations={reservations} onSelect={setSelected} notify={notify} canConfigure={canConfigure} canOperate={canOperate} />}
+        {screen === "floor" && <><div className="px-4 pt-5 md:px-6"><FloorOperationsWorkspace reservations={reservations} accessContext={accessContext} canOperate={canOperate} notify={notify} /></div><FloorPlanScreen reservations={reservations} onSelect={setSelected} notify={notify} canConfigure={canConfigure} canOperate={canOperate} accessContext={accessContext} /></>}
         {screen === "calendar" && <CalendarScreen reservations={reservations} onSelect={setSelected} />}
         {screen === "guests" && <CrmWorkspace notify={notify} />}
         {screen === "marketing" && <MarketingWorkspace notify={notify} />}
@@ -216,8 +220,8 @@ export function ReservationWorkspace({ accessContext }: { accessContext: AccessC
       {showProfileCommand ? <div className="mt-1 border-t border-border pt-1"><button onClick={() => openScreen("profile")} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm hover:bg-secondary"><UserRound size={16} className="text-primary" /><span className="flex-1">Profile & security</span></button></div> : null}
       {commandNavigation.length === 0 && commandReservations.length === 0 && !showProfileCommand ? <div className="px-4 py-10 text-center"><CommandIcon size={24} className="mx-auto text-muted-foreground" /><p className="mt-3 text-sm font-medium">No matching results</p><p className="mt-1 text-xs text-muted-foreground">Try a guest name, reservation code, mobile number, or workspace.</p></div> : null}
     </div><div className="flex items-center justify-between border-t border-border bg-secondary/60 px-4 py-2 text-[11px] text-muted-foreground"><span>Results respect your role and outlet access.</span><span>Esc to close</span></div></section></div>}
-    {modal === "new" && <NewReservationModal onClose={() => setModal(null)} onCreate={(reservation) => { setReservations((prev) => [...prev, reservation]); setModal(null); notify(`${reservation.code} created and inventory rechecked.`); }} />}
-    {modal === "availability" && <AvailabilityModal reservations={reservations} onClose={() => setModal(null)} onContinue={() => setModal("new")} />}
+    {modal === "new" && <NewReservationModal venueId={accessContext.isDemo ? undefined : currentVenueId} onClose={() => setModal(null)} onCreate={(reservation) => { setReservations((prev) => [...prev, reservation]); setModal(null); notify(`${reservation.code} created and inventory rechecked.`); }} />}
+    {modal === "availability" && <AvailabilityModal reservations={reservations} venueId={accessContext.isDemo ? undefined : currentVenueId} onClose={() => setModal(null)} onContinue={() => setModal("new")} />}
     {selected && <ReservationDrawer reservation={selected} canOperate={canOperate} onClose={() => setSelected(null)} onUpdate={(next) => { if (selected.status === "pending_deposit" && next.status === "confirmed" && !["paid", "waived"].includes(selected.deposit)) { notify("Confirmation blocked: the required deposit must be independently verified first."); return; } setReservations((prev) => prev.map((r) => r.id === next.id ? next : r)); setSelected(next); notify(`${next.code} updated.`); }} />}
     {toast && <div role="status" className="fixed bottom-5 right-5 z-[80] flex max-w-sm items-center gap-3 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg"><CheckCircle2 size={18} />{toast}</div>}
   </div>;
@@ -268,10 +272,13 @@ const floorStateStyle: Record<FloorTableState, string> = {
   cleaning: "border-[#9aa7ad] bg-[#58666e] text-white shadow-[0_5px_0_#39454b]",
 };
 
-function FloorPlanScreen({ reservations, onSelect, notify, canConfigure, canOperate }: { reservations: Reservation[]; onSelect: (r: Reservation) => void; notify: (message: string) => void; canConfigure: boolean; canOperate: boolean }) {
+function FloorPlanScreen({ reservations, onSelect, notify, canConfigure, canOperate, accessContext }: { reservations: Reservation[]; onSelect: (r: Reservation) => void; notify: (message: string) => void; canConfigure: boolean; canOperate: boolean; accessContext: AccessContext }) {
   const [layoutTables, setLayoutTables] = useState<FloorTable[]>(waterfrontReferenceTables);
   const [combinations, setCombinations] = useState<TableCombination[]>(initialCombinations);
   const [selectedTable, setSelectedTable] = useState<FloorTable | null>(waterfrontReferenceTables[0]);
+  const [floorPlanId, setFloorPlanId] = useState<string | null>(null);
+  const [draftVersionId, setDraftVersionId] = useState<string | null>(null);
+  const [hasDraftChanges, setHasDraftChanges] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [mergeMode, setMergeMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -281,18 +288,56 @@ function FloorPlanScreen({ reservations, onSelect, notify, canConfigure, canOper
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; origins: Array<{ id: string; x: number; y: number }> } | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    if (accessContext.isDemo) {
+      const timer = window.setTimeout(() => {
+        try {
+          const saved = window.localStorage.getItem("waterfront-floor-layout-v1");
+          if (saved) {
+            const parsed = JSON.parse(saved) as { tables?: FloorTable[]; combinations?: TableCombination[] };
+            if (parsed.tables?.length) setLayoutTables(parsed.tables);
+            if (parsed.combinations) setCombinations(parsed.combinations);
+          }
+        } catch { /* A malformed local demo layout falls back to the supplied Waterfront reference. */ }
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    const venueId = accessContext.conceptId ?? accessContext.accessibleConcepts?.[0]?.id;
+    if (!venueId) return;
+    let cancelled = false;
+    const serviceDate = new Date().toISOString().slice(0, 10);
+    void (async () => {
       try {
-        const saved = window.localStorage.getItem("waterfront-floor-layout-v1");
-        if (saved) {
-          const parsed = JSON.parse(saved) as { tables?: FloorTable[]; combinations?: TableCombination[] };
-          if (parsed.tables?.length) setLayoutTables(parsed.tables);
-          if (parsed.combinations) setCombinations(parsed.combinations);
+        const plansResponse = await fetch(`/api/v1/staff/floor-plans?venueId=${encodeURIComponent(venueId)}`, { cache: "no-store" });
+        const plansData = await plansResponse.json() as { floorPlans?: Array<{ id: string; current_version_id: string | null }> };
+        const plan = plansData.floorPlans?.[0];
+        if (cancelled || !plan) return;
+        setFloorPlanId(plan.id);
+        const runsResponse = await fetch(`/api/v1/staff/service-runs?venueId=${encodeURIComponent(venueId)}&serviceDate=${serviceDate}`, { cache: "no-store" });
+        const runsData = await runsResponse.json() as { serviceRuns?: Array<{ id: string }> };
+        let runId = runsData.serviceRuns?.[0]?.id;
+        if (!runId) {
+          const openResponse = await fetch("/api/v1/staff/service-runs", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": `floor-open-${venueId}-${serviceDate}` }, body: JSON.stringify({ venueId, serviceDate }) });
+          const openData = await openResponse.json() as { serviceRun?: { serviceRunId?: string; id?: string } };
+          runId = openData.serviceRun?.serviceRunId ?? openData.serviceRun?.id;
         }
-      } catch { /* A malformed local demo layout falls back to the supplied Waterfront reference. */ }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+        if (!runId) return;
+        const snapshotResponse = await fetch(`/api/v1/staff/service-runs/${runId}/snapshot`, { cache: "no-store" });
+        const snapshotData = await snapshotResponse.json() as { snapshot?: { plan: { versionId: string }; tables: Array<{ id: string; label: string; tableType: string; capacity: number; x: number; y: number; width: number; height: number; rotation: number; presentationState: string; reservationId: string | null; guestName: string | null }>; reservations: Array<{ id: string; startsAt: string }> } };
+        if (cancelled || !snapshotData.snapshot) return;
+        setDraftVersionId(snapshotData.snapshot.plan.versionId);
+        setHasDraftChanges(false);
+        const reservationsById = new Map(snapshotData.snapshot.reservations.map((reservation) => [reservation.id, reservation]));
+        const liveTables: FloorTable[] = snapshotData.snapshot.tables.map((table) => {
+          const reservation = table.reservationId ? reservationsById.get(table.reservationId) : undefined;
+          const kind: FloorTableKind = table.tableType === "T1" || table.tableType === "T3" ? table.tableType : "T2";
+          const state: FloorTableState = table.presentationState === "seated" ? "seated" : table.presentationState === "needs_clearing" ? "cleaning" : table.presentationState === "blocked" ? "hold" : table.presentationState === "available" ? "available" : "reserved";
+          return { id: table.id, label: table.label, kind, seats: table.capacity, x: table.x, y: table.y, width: table.width, height: table.height, rotation: table.rotation, state, guest: table.guestName ?? undefined, time: reservation ? new Date(reservation.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : undefined, reservationId: table.reservationId ?? undefined };
+        });
+        if (liveTables.length) { setLayoutTables(liveTables); setSelectedTable(liveTables[0]); setCombinations([]); }
+      } catch { notify("Live floor data is unavailable; the reference layout remains available."); }
+    })();
+    return () => { cancelled = true; };
+  }, [accessContext, notify]);
 
   const queue = reservations.filter((r) => r.guestName.toLowerCase().includes(query.toLowerCase())).filter((r) => queueFilter === "all" || (queueFilter === "seated" ? r.status === "seated" : r.status !== "seated"));
   const selectedReservation = selectedTable?.reservationId ? reservations.find((r) => r.id === selectedTable.reservationId) : undefined;
@@ -370,9 +415,30 @@ function FloorPlanScreen({ reservations, onSelect, notify, canConfigure, canOper
     notify(`${combination.name} separated into individual tables.`);
   }
 
-  function saveLayout() {
+  async function saveLayout() {
+    if (!accessContext.isDemo && floorPlanId) {
+      const objects = layoutTables.filter((table) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(table.id)).map((table) => ({ tableId: table.id, x: table.x, y: table.y, width: table.width, height: table.height, rotation: table.rotation, label: table.label }));
+      if (!objects.length) return notify("The live table inventory is still loading. Sync the floor and try again.");
+      const response = await fetch(`/api/v1/staff/floor-plans/${floorPlanId}/draft`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ objects }) });
+      const data = await response.json().catch(() => ({})) as { draft?: { versionId?: string; validation?: { valid?: boolean } }; error?: string };
+      if (!response.ok || !data.draft) return notify(data.error ?? "The floor draft could not be saved.");
+      setDraftVersionId(data.draft.versionId ?? draftVersionId);
+      setHasDraftChanges(true);
+      notify(data.draft.validation?.valid === false ? "Draft saved with validation warnings. Review before publishing." : "Floor draft saved as a new immutable version.");
+      return;
+    }
     window.localStorage.setItem("waterfront-floor-layout-v1", JSON.stringify({ tables: layoutTables, combinations }));
     notify("Floor layout and table combinations saved locally for this demo.");
+  }
+
+  async function publishLayout() {
+    if (accessContext.isDemo || !floorPlanId || !draftVersionId || !hasDraftChanges) return notify("Save a draft before publishing the floor plan.");
+    const response = await fetch(`/api/v1/staff/floor-plans/${floorPlanId}/publish`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ versionId: draftVersionId }) });
+    const data = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) return notify(data.error ?? "The floor plan could not be published.");
+    setHasDraftChanges(false);
+    setIsEditing(false);
+    notify("Floor plan published. New service runs will use this version.");
   }
 
   function resetLayout() {
@@ -407,14 +473,14 @@ function FloorPlanScreen({ reservations, onSelect, notify, canConfigure, canOper
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex h-10 items-center rounded-lg border border-[var(--input)] bg-card p-1 shadow-sm"><button aria-label="Previous day" className="rounded-lg p-2 text-[var(--muted-foreground)]"><ChevronLeft size={15} /></button><button className="px-3 text-xs font-bold text-[#3c4e4a]">Fri, 07 Aug</button><button aria-label="Next day" className="rounded-lg p-2 text-[var(--muted-foreground)]"><ChevronRight size={15} /></button></div>
         <div className="flex h-10 items-center rounded-lg border border-[var(--input)] bg-card p-1 shadow-sm"><button className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#73807d]">Lunch</button><button className="rounded-lg bg-[var(--primary-strong)] px-3 py-1.5 text-xs font-bold text-white">Dinner</button></div>
-        {isEditing ? <><Button variant="outline" onClick={() => { setIsEditing(false); setMergeMode(false); setSelectedIds([]); }}>Exit editor</Button><Button onClick={saveLayout}><Check size={16} />Save layout</Button></> : <>{canConfigure && <Button variant="outline" onClick={() => setIsEditing(true)}><TableProperties size={16} />Edit layout</Button>}<Button onClick={() => notify("Floor plan refreshed from live inventory.")}><Sparkles size={16} />Sync floor</Button></>}
+        {isEditing ? <><Button variant="outline" onClick={() => { setIsEditing(false); setMergeMode(false); setSelectedIds([]); }}>Exit editor</Button><Button onClick={() => void saveLayout()}><Check size={16} />Save layout</Button>{!accessContext.isDemo && <Button variant="outline" disabled={!hasDraftChanges} onClick={() => void publishLayout()}>Publish plan</Button>}</> : <>{canConfigure && <Button variant="outline" onClick={() => setIsEditing(true)}><TableProperties size={16} />Edit layout</Button>}<Button onClick={() => notify("Floor plan refreshed from live inventory.")}><Sparkles size={16} />Sync floor</Button></>}
       </div>
     </div>
 
     <div className="grid min-h-[720px] overflow-hidden rounded-lg border border-[#dbe0db] bg-card shadow-soft lg:grid-cols-[300px_1fr]">
       <aside className="border-b border-[var(--border)] bg-[#fbfaf6] lg:border-b-0 lg:border-r">
         {isEditing && <div className="flex h-full flex-col">
-          <div className="border-b border-[var(--border)] p-4"><div className="flex items-start justify-between"><div><div className="text-[9px] font-bold uppercase tracking-[.14em] text-[var(--accent-strong)]">Configuration mode</div><h2 className="font-display mt-1 text-xl text-[#243c39]">Floor setup</h2></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-bold uppercase text-emerald-700">Draft</span></div><p className="mt-2 text-[11px] leading-5 text-[var(--muted-foreground)]">Seeded from Waterfront’s supplied plan: 9 T1, 18 T2 and 4 T3 tables. Drag changes stay in this demo until saved.</p></div>
+          <div className="border-b border-[var(--border)] p-4"><div className="flex items-start justify-between"><div><div className="text-[9px] font-bold uppercase tracking-[.14em] text-[var(--accent-strong)]">Configuration mode</div><h2 className="font-display mt-1 text-xl text-[#243c39]">Floor setup</h2></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-bold uppercase text-emerald-700">Draft</span></div><p className="mt-2 text-[11px] leading-5 text-[var(--muted-foreground)]">Seeded from Waterfront’s supplied plan: 9 T1, 18 T2 and 4 T3 tables. {accessContext.isDemo ? "Drag changes stay in this demo until saved." : "Drag changes save as a new immutable draft version before publication."}</p></div>
           <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
             <EditorLabel>Editing tool</EditorLabel>
             <div className="grid grid-cols-2 rounded-lg bg-[var(--secondary)] p-1"><button onClick={() => { setMergeMode(false); setSelectedIds([]); }} className={cx("rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-wide", !mergeMode ? "bg-card text-[#24554b] shadow-sm" : "text-[var(--muted-foreground)]")}>Move tables</button><button onClick={() => { setMergeMode(true); setSelectedIds([]); }} className={cx("rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-wide", mergeMode ? "bg-card text-[#8a5b13] shadow-sm" : "text-[var(--muted-foreground)]")}>Merge tables</button></div>
@@ -568,22 +634,60 @@ function ModalShell({ title, eyebrow, onClose, children, wide }: { title: string
   return <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#102421]/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" role="dialog" aria-modal="true"><div className={cx("max-h-[94vh] w-full overflow-y-auto rounded-t-3xl bg-[var(--card)] shadow-2xl scrollbar-thin sm:rounded-lg", wide ? "max-w-4xl" : "max-w-2xl")}><div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)]/95 px-6 py-5 backdrop-blur"><div><div className="text-[10px] font-bold uppercase tracking-[.15em] text-[var(--accent-strong)]">{eyebrow}</div><h2 className="font-display mt-1 text-2xl text-[var(--foreground)]">{title}</h2></div><button aria-label="Close" onClick={onClose} className="rounded-full border border-[#dde1dc] p-2 text-[var(--muted-foreground)] hover:bg-secondary"><X size={18} /></button></div>{children}</div></div>;
 }
 
-function NewReservationModal({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Reservation) => void }) {
+function NewReservationModal({ venueId, onClose, onCreate }: { venueId?: string; onClose: () => void; onCreate: (r: Reservation) => void }) {
   const [bookingType, setBookingType] = useState<BookingType>("regular_table");
   const [guestCount, setGuestCount] = useState(2);
   const rules = determineDepositRules({ guestCount, largePartyThreshold: 10, bookingType });
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const data = new FormData(event.currentTarget); const mobile = normalizePhilippineMobile(String(data.get("mobile"))) ?? String(data.get("mobile"));
-    onCreate({ id: crypto.randomUUID(), code: `WF-260807-${String(19 + Math.floor(Math.random() * 40)).padStart(3, "0")}`, guestName: String(data.get("guestName")), guestCount, mobile, bookingType: guestCount >= 10 && bookingType === "regular_table" ? "large_party" : bookingType, area: bookingType === "vip_room" ? "VIP Room" : bookingType === "private_event" ? "Whole Restaurant" : "Main Dining", date: String(data.get("date")), start: String(data.get("time")), durationMinutes: Number(data.get("duration")), status: rules.length ? "pending_deposit" : "pending_confirmation", source: String(data.get("source")), deposit: rules.length ? "pending" : "not_required", occasion: String(data.get("occasion") || "") });
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const mobile = normalizePhilippineMobile(String(data.get("mobile"))) ?? String(data.get("mobile"));
+    const reservationInput = { guestName: String(data.get("guestName")), guestCount, mobile, bookingType: (guestCount >= 10 && bookingType === "regular_table" ? "large_party" : bookingType) as BookingType, area: (bookingType === "vip_room" ? "VIP Room" : bookingType === "private_event" ? "Whole Restaurant" : "Main Dining") as Reservation["area"], date: String(data.get("date")), start: String(data.get("time")), durationMinutes: Number(data.get("duration")), source: String(data.get("source")), occasion: String(data.get("occasion") || "") };
+    if (venueId) {
+      try {
+        const response = await fetch("/api/v1/staff/reservations", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ venueId, date: reservationInput.date, time: reservationInput.start, partySize: reservationInput.guestCount, durationMinutes: reservationInput.durationMinutes, fullName: reservationInput.guestName, mobile: reservationInput.mobile, email: String(data.get("email") || ""), occasion: reservationInput.occasion, specialRequests: String(data.get("requests") || ""), source: reservationInput.source }) });
+        const result = await response.json() as { error?: string; confirmationCode?: string; status?: Reservation["status"] };
+        if (!response.ok || !result.confirmationCode) throw new Error(result.error ?? "The reservation could not be created.");
+        onCreate({ id: result.confirmationCode, code: result.confirmationCode, guestName: reservationInput.guestName, guestCount: reservationInput.guestCount, mobile: reservationInput.mobile, bookingType: reservationInput.bookingType as BookingType, area: reservationInput.area, date: reservationInput.date, start: reservationInput.start, durationMinutes: reservationInput.durationMinutes, status: result.status ?? "confirmed", source: reservationInput.source, deposit: "not_required", occasion: reservationInput.occasion });
+      } catch (submitError) {
+        window.alert(submitError instanceof Error ? submitError.message : "The reservation could not be created.");
+      }
+      return;
+    }
+    onCreate({ id: crypto.randomUUID(), code: `WF-260807-${String(19 + Math.floor(Math.random() * 40)).padStart(3, "0")}`, ...reservationInput, bookingType: reservationInput.bookingType as BookingType, status: rules.length ? "pending_deposit" : "pending_confirmation", deposit: rules.length ? "pending" : "not_required" });
   }
   return <ModalShell title="Create reservation" eyebrow="Atomic availability recheck on submit" onClose={onClose} wide><form onSubmit={submit}><div className="grid gap-7 p-6 md:grid-cols-[1.05fr_.95fr]"><div className="space-y-5"><SectionLabel number="01" title="Booking details" /><div className="grid grid-cols-2 gap-3"><Field label="Booking type"><select value={bookingType} onChange={(e) => setBookingType(e.target.value as BookingType)} name="bookingType"><option value="regular_table">Main Dining</option><option value="vip_room">VIP Room</option><option value="private_event">Private event</option><option value="walk_in">Walk-in</option></select></Field><Field label="Party size"><input required min="1" max={bookingType === "vip_room" ? 24 : 200} type="number" value={guestCount} onChange={(e) => setGuestCount(Number(e.target.value))} /></Field><Field label="Date"><input required name="date" type="date" defaultValue="2026-08-07" /></Field><Field label="Start time"><input required name="time" type="time" defaultValue="20:00" /></Field><Field label="Duration"><select name="duration" defaultValue={bookingType === "vip_room" ? "240" : "120"}><option value="120">2 hours</option><option value="180">3 hours</option><option value="240">4 hours</option></select></Field><Field label="Table request"><select name="table"><option>General seating</option><option>M1</option><option>M2</option><option>M1 + M2</option></select></Field></div><div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><div className="flex items-center gap-2 text-xs font-bold text-emerald-800"><CheckCircle2 size={16} />Available — general seating</div><p className="mt-1 pl-6 text-[11px] text-emerald-700">42 of 60 Main Dining seats remain at this time.</p></div><SectionLabel number="02" title="Guest details" /><div className="grid grid-cols-2 gap-3"><div className="col-span-2"><Field label="Full name"><input required name="guestName" placeholder="Guest’s full name" /></Field></div><Field label="Mobile number"><input required name="mobile" placeholder="09xx xxx xxxx" /></Field><Field label="Email (optional)"><input name="email" type="email" placeholder="guest@email.com" /></Field><Field label="Inquiry source"><select name="source" defaultValue="Facebook Messenger">{inquirySources.map((s) => <option key={s}>{s}</option>)}</select></Field><Field label="Occasion"><input name="occasion" placeholder="Birthday, business…" /></Field></div></div><div className="space-y-5"><SectionLabel number="03" title="Confirmation & payment" /><div className={cx("rounded-lg border p-4", rules.length ? "border-amber-200 bg-amber-50" : "border-[var(--border)] bg-[#f8f8f4]")}><div className="flex items-start gap-3"><div className={cx("rounded-lg p-2", rules.length ? "bg-amber-100 text-amber-700" : "bg-card text-[var(--muted-foreground)]")}><CircleDollarSign size={18} /></div><div><h3 className="text-sm font-bold text-[var(--secondary-foreground)]">{rules.length ? "Deposit required" : "No deposit required"}</h3><p className="mt-1 text-[11px] leading-5 text-[#6f7b78]">{rules.length ? `Triggered by: ${rules.map((r) => r.replaceAll("_", " ")).join(", ")}. Record amount and due date below.` : "No active rule applies to this reservation."}</p></div></div></div>{rules.length > 0 && <div className="grid grid-cols-2 gap-3"><Field label="Amount due (PHP)"><input name="amount" type="number" placeholder="0.00" /></Field><Field label="Due date"><input name="dueDate" type="date" defaultValue="2026-08-07" /></Field></div>}<Field label="Initial status"><select name="status" defaultValue={rules.length ? "pending_deposit" : "pending_confirmation"}><option value="pending_confirmation">Pending confirmation</option><option value="temporary_hold">Temporary hold</option><option value="pending_deposit">Pending deposit</option><option value="confirmed">Confirmed</option></select></Field><Field label="Confirmation deadline"><input name="confirmationDue" type="datetime-local" defaultValue="2026-08-07T16:00" /></Field><Field label="Special requests"><textarea name="requests" rows={3} placeholder="Allergies, accessibility, seating preferences…" className="w-full rounded-lg border border-[var(--input)] bg-[var(--card)] p-3 text-sm normal-case tracking-normal" /></Field><div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[11px] leading-5 text-blue-800"><ShieldCheck size={15} className="mr-1.5 inline" />Submission rechecks capacity, table locks, VIP overlap, and private-event closures in one database transaction.</div></div></div><div className="flex items-center justify-between border-t border-[var(--border)] bg-[#faf9f4] px-6 py-4"><p className="hidden text-[10px] text-[var(--muted-foreground)] sm:block">Required fields are validated on the server.</p><div className="ml-auto flex gap-2"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit"><Check size={16} />Create reservation</Button></div></div></form></ModalShell>;
 }
 
 function SectionLabel({ number, title }: { number: string; title: string }) { return <div className="flex items-center gap-3"><span className="font-display text-sm font-bold text-[#e2810f]">{number}</span><h3 className="text-[11px] font-bold uppercase tracking-[.14em] text-[#4d5c59]">{title}</h3><div className="h-px flex-1 bg-[#e2e5e0]" /></div>; }
 
-function AvailabilityModal({ reservations, onClose, onContinue }: { reservations: Reservation[]; onClose: () => void; onContinue: () => void }) {
-  const [searched, setSearched] = useState(true); const [pax, setPax] = useState(4); const committed = useMemo(() => reservations.filter((r) => r.area === "Main Dining" && r.start <= "19:00").reduce((s, r) => s + r.guestCount, 0), [reservations]);
-  return <ModalShell title="Check availability" eyebrow="Waterfront · Iloilo" onClose={onClose}><div className="p-6"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Field label="Area"><select><option>Main Dining</option><option>VIP Room</option></select></Field><Field label="Date"><input type="date" defaultValue="2026-08-07" /></Field><Field label="Time"><input type="time" defaultValue="19:00" /></Field><Field label="Party size"><input type="number" min="1" value={pax} onChange={(e) => setPax(Number(e.target.value))} /></Field></div><Button className="mt-4 w-full" onClick={() => setSearched(true)}><Search size={16} />Search availability</Button>{searched && <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-5"><div className="flex items-start gap-3"><div className="rounded-full bg-emerald-100 p-2 text-emerald-700"><Check size={19} /></div><div className="flex-1"><div className="text-sm font-bold text-emerald-900">Available — general seating</div><p className="mt-1 text-xs leading-5 text-emerald-800">This party fits Main Dining capacity. No specific table is promised.</p><div className="mt-4 grid grid-cols-3 divide-x divide-emerald-200 rounded-lg bg-card/60 py-3 text-center"><div><b className="font-display text-xl text-emerald-900">60</b><span className="block text-[9px] uppercase tracking-wide text-emerald-700">capacity</span></div><div><b className="font-display text-xl text-emerald-900">{committed}</b><span className="block text-[9px] uppercase tracking-wide text-emerald-700">committed</span></div><div><b className="font-display text-xl text-emerald-900">{60 - committed - pax}</b><span className="block text-[9px] uppercase tracking-wide text-emerald-700">after booking</span></div></div></div></div></div>}<div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>Close</Button><Button onClick={onContinue}>Continue to reservation<ChevronRight size={16} /></Button></div></div></ModalShell>;
+function AvailabilityModal({ reservations, venueId, onClose, onContinue }: { reservations: Reservation[]; venueId?: string; onClose: () => void; onContinue: () => void }) {
+  const [searched, setSearched] = useState(true);
+  const [pax, setPax] = useState(4);
+  const [date, setDate] = useState("2026-08-07");
+  const [time, setTime] = useState("19:00");
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveAvailability, setLiveAvailability] = useState<{ state: "available" | "limited" | "unavailable"; reason?: string; slots: Array<{ localTime: string; assignment?: { capacity?: number; tableCount?: number } }> } | null>(null);
+  const committed = useMemo(() => reservations.filter((r) => r.area === "Main Dining" && r.start <= time).reduce((s, r) => s + r.guestCount, 0), [reservations, time]);
+
+  async function searchLiveAvailability() {
+    setSearched(true);
+    if (!venueId) return;
+    setLiveLoading(true);
+    try {
+      const query = new URLSearchParams({ date, partySize: String(pax), start: time, end: time });
+      const response = await fetch(`/api/v1/staff/venues/${venueId}/availability?${query}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("AVAILABILITY_UNAVAILABLE");
+      setLiveAvailability(await response.json() as { state: "available" | "limited" | "unavailable"; reason?: string; slots: Array<{ localTime: string; assignment?: { capacity?: number; tableCount?: number } }> });
+    } catch {
+      setLiveAvailability(null);
+    } finally {
+      setLiveLoading(false);
+    }
+  }
+
+  const liveAvailable = liveAvailability?.state !== "unavailable" && Boolean(liveAvailability?.slots.length);
+  return <ModalShell title="Check availability" eyebrow="Waterfront · Iloilo" onClose={onClose}><div className="p-6"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Field label="Area"><select><option>Main Dining</option><option>VIP Room</option></select></Field><Field label="Date"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field><Field label="Time"><input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></Field><Field label="Party size"><input type="number" min="1" value={pax} onChange={(e) => setPax(Number(e.target.value))} /></Field></div><Button className="mt-4 w-full" disabled={liveLoading} onClick={() => void searchLiveAvailability()}><Search size={16} />{liveLoading ? "Checking table inventory…" : "Search availability"}</Button>{searched && <div className={cx("mt-6 rounded-lg border p-5", liveAvailability && !liveAvailable ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50")}><div className="flex items-start gap-3"><div className={cx("rounded-full p-2", liveAvailability && !liveAvailable ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700")}><Check size={19} /></div><div className="flex-1"><div className={cx("text-sm font-bold", liveAvailability && !liveAvailable ? "text-rose-900" : "text-emerald-900")}>{liveAvailability && !liveAvailable ? "No table-aware inventory" : "Available — general seating"}</div><p className={cx("mt-1 text-xs leading-5", liveAvailability && !liveAvailable ? "text-rose-800" : "text-emerald-800")}>{liveAvailability && !liveAvailable ? "Choose another time or adjust the party size." : liveAvailability ? `${liveAvailability.slots.length} live option${liveAvailability.slots.length === 1 ? "" : "s"} found from physical tables and approved combinations.` : "This party fits Main Dining capacity. No specific table is promised in preview mode."}</p>{liveAvailability && liveAvailable && <div className="mt-4 flex flex-wrap gap-2">{liveAvailability.slots.slice(0, 8).map((slot) => <span key={slot.localTime} className="rounded-full border border-emerald-200 bg-card/70 px-3 py-1.5 text-[10px] font-bold text-emerald-900">{formatTime(slot.localTime)}{slot.assignment?.tableCount ? ` · ${slot.assignment.tableCount} table${slot.assignment.tableCount === 1 ? "" : "s"}` : ""}</span>)}</div>}{!liveAvailability && <div className="mt-4 grid grid-cols-3 divide-x divide-emerald-200 rounded-lg bg-card/60 py-3 text-center"><div><b className="font-display text-xl text-emerald-900">60</b><span className="block text-[9px] uppercase tracking-wide text-emerald-700">capacity</span></div><div><b className="font-display text-xl text-emerald-900">{committed}</b><span className="block text-[9px] uppercase tracking-wide text-emerald-700">committed</span></div><div><b className="font-display text-xl text-emerald-900">{60 - committed - pax}</b><span className="block text-[9px] uppercase tracking-wide text-emerald-700">after booking</span></div></div>}</div></div></div>}<div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>Close</Button><Button onClick={onContinue} disabled={liveAvailability !== null && !liveAvailable}>Continue to reservation<ChevronRight size={16} /></Button></div></div></ModalShell>;
 }
 
 function ReservationDrawer({ reservation, onClose, onUpdate, canOperate }: { reservation: Reservation; onClose: () => void; onUpdate: (r: Reservation) => void; canOperate: boolean }) {
