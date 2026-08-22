@@ -22,10 +22,17 @@ export const demoAccessContext: AccessContext = {
 
 export async function getCurrentAccessContext(): Promise<AccessContext | null> {
   const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const isProduction = process.env.APP_ENVIRONMENT === "production" || process.env.NODE_ENV === "production";
   // Demo mode is intentionally limited to local preview. A production build must
   // always resolve the authenticated Supabase user so account security controls
   // (including self-service password changes) are not silently disabled.
-  if (!configured || (process.env.APP_DEMO_MODE === "true" && process.env.NODE_ENV !== "production")) return demoAccessContext;
+  //
+  // The unconfigured branch is guarded the same way. It previously returned a
+  // Superadmin context in any environment, so a rotated or mistyped Vercel
+  // variable would have replaced the real app with an open one instead of
+  // failing. In production, no configuration now means no session.
+  if (isProduction && !configured) return null;
+  if (!configured || (process.env.APP_DEMO_MODE === "true" && !isProduction)) return demoAccessContext;
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -50,6 +57,10 @@ export async function getCurrentAccessContext(): Promise<AccessContext | null> {
     const allowlistedEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean);
     const email = user.email?.toLowerCase();
     if (!email || !allowlistedEmails.includes(email)) return null;
+    // Bootstrapping a Superadmin is the highest-privilege action in the system,
+    // so it must not rest on the project's mailer settings being right. Require
+    // a confirmed address here regardless of what the hosted config says.
+    if (!user.email_confirmed_at) return null;
 
     const admin = createSupabaseAdminClient();
     const { data: existingProfile } = await admin.from("staff_profiles").select("user_id").eq("user_id", user.id).maybeSingle();

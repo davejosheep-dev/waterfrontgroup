@@ -11,8 +11,15 @@ export async function proxy(request: NextRequest) {
     || request.nextUrl.pathname.startsWith("/api/webhooks/");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (process.env.APP_DEMO_MODE === "true" && process.env.NODE_ENV !== "production") return NextResponse.next({ request });
-  if (!url || !key) return NextResponse.next({ request });
+  const isProduction = process.env.APP_ENVIRONMENT === "production" || process.env.NODE_ENV === "production";
+  if (process.env.APP_DEMO_MODE === "true" && !isProduction) return NextResponse.next({ request });
+  // Missing configuration must never open the app. Outside production this
+  // degrades to the local demo; in production it refuses to serve rather than
+  // waving every request through unauthenticated.
+  if (!url || !key) {
+    if (isProduction) return new NextResponse("Service unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.next({ request });
+  }
   if (publicPath) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });
