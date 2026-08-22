@@ -173,7 +173,11 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+# Waterfront is a staff-only tool with no public account model. Accounts are
+# created by a Superadmin through the invitation flow in /api/admin/members,
+# never by self-registration. Keep this false so `supabase config push` can
+# never re-open registration on the hosted project.
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -218,12 +222,18 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-enable_signup = true
+# See the note on [auth].enable_signup — staff accounts are invitation-only.
+enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# The hosted project already enforces this (mailer_autoconfirm: false). The
+# committed value used to disagree, which meant a single `supabase config push`
+# would have switched confirmation off in production — the one control keeping
+# the Superadmin bootstrap in access-context.ts from being reachable by anyone
+# who could name an allowlisted address. The two now agree.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
