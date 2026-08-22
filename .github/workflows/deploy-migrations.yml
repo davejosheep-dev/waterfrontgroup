@@ -1,0 +1,51 @@
+name: Deploy migrations
+
+# Schema changes reach the hosted project through this workflow only, so the
+# credentials live in GitHub secrets rather than on a laptop and every apply
+# leaves a run record.
+#
+# Deliberately manual. Applying DDL to a production database holding live
+# reservations is not something a merge should trigger on its own. Point the
+# `production` environment at a required reviewer in repository settings to
+# add an approval gate; switch this to `on: push` only once you want schema
+# changes to ship automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List pending migrations without applying them"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to the hosted project
+        run: supabase link --project-ref "${{ vars.SUPABASE_PROJECT_REF }}"
+
+      - name: Show local versus remote migration state
+        run: supabase migration list
+
+      # `config push` is never run here. The committed config.toml is a local
+      # development profile; pushing it would overwrite hosted auth settings.
+      - name: Apply pending migrations
+        if: ${{ inputs.dry_run == false }}
+        run: supabase db push
+
+      - name: Confirm remote is in sync
+        if: ${{ inputs.dry_run == false }}
+        run: supabase migration list

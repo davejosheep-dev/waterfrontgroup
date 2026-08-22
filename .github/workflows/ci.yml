@@ -26,9 +26,54 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # `next build` must precede `tsc`: LayoutProps and the typed-route globals
+      # are generated during the build, so typechecking a clean checkout first
+      # fails with TS2304 and the whole gate goes red on every fresh runner.
+      - run: npm run build
       - run: npm run typecheck
       - run: npm run test
-      - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Deliberately no Supabase variables: the suite exercises the
+      # credential-free demo dataset, and playwright.config.ts starts its own
+      # dev server (reuseExistingServer is false under CI).
+      APP_ENVIRONMENT: local
+      APP_DEMO_MODE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Fails the build on a high or critical advisory in shipped dependencies.
+      # Dev-only advisories are reported but do not block.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit || true
 
   database:
     runs-on: ubuntu-latest
@@ -40,3 +85,6 @@ jobs:
           version: latest
       - run: supabase start
       - run: supabase test db
+      # Catches migrations that apply cleanly but leave the schema different
+      # from what a fresh `db reset` produces.
+      - run: supabase db lint --level warning
