@@ -1,0 +1,20 @@
+# The repository stores text as LF and CI runs on Ubuntu. Declaring it here
+# keeps Windows checkouts from introducing CRLF into diffs.
+* text=auto eol=lf
+
+# Generated — collapse in diffs and reviews.
+package-lock.json linguist-generated=true -diff
+
+# SQL migrations are applied verbatim; never let a filter touch them.
+*.sql text eol=lf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
