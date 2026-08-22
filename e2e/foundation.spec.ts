@@ -18,9 +18,17 @@ test("authorization fallback pages use the shared operations baseline", async ({
 
 test("readiness endpoint returns a correlation id without configuration details", async ({ request }) => {
   const response = await request.get("/api/v1/health");
-  expect(response.status()).toBe(200);
+  // This suite runs credential-free: playwright.config.ts sets APP_DEMO_MODE and
+  // supplies no Supabase variables, so the probe is expected to report degraded.
+  // Asserting "ready" here would only pass against a configured project, and
+  // would mean the probe had stopped reflecting whether the data layer is
+  // actually reachable — which is the one thing a readiness endpoint is for.
+  expect(response.status()).toBe(503);
   const payload = await response.json() as { status: string; service: string; requestId: string };
-  expect(payload).toMatchObject({ status: "ready", service: "waterfront-reservations" });
+  expect(payload).toMatchObject({ status: "degraded", service: "waterfront-reservations" });
   expect(payload.requestId).toBeTruthy();
   expect(response.headers()["x-request-id"]).toBe(payload.requestId);
+  // The endpoint is public and unauthenticated. A degraded response must not
+  // disclose which variable is missing or where the project lives.
+  expect(JSON.stringify(payload)).not.toMatch(/supabase|secret|publishable|apikey|postgres|https?:\/\//i);
 });
